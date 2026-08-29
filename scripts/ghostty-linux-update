@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+BREW=/home/linuxbrew/.linuxbrew/bin/brew
+FORMULA=local/apps/ghostty-linux
+REPO='copr:copr.fedorainfracloud.org:scottames:ghostty'
+LOCK_DIR="${XDG_RUNTIME_DIR:-/tmp}"
+
+usage() {
+    echo "usage: ghostty-linux-update [--check]"
+}
+
+case "${1:-}" in
+    ""|--check) ;;
+    -h|--help)
+        usage
+        exit 0
+        ;;
+    *)
+        usage >&2
+        exit 2
+        ;;
+esac
+
+exec 9>"$LOCK_DIR/ghostty-linux-update.lock"
+flock -n 9 || exit 0
+
+url=$(dnf --assumeyes --refresh --repo "$REPO" repoquery \
+    --latest-limit 1 --location 'ghostty.x86_64' 2>/dev/null |
+    awk '/^https:.*\.x86_64\.rpm$/ { print; exit }')
+
+if [[ -z "$url" ]]; then
+    echo "No Ghostty RPM was found in $REPO." >&2
+    exit 1
+fi
+
+tmpdir=$(mktemp -d)
+trap 'find "$tmpdir" -depth -delete 2>/dev/null || true' EXIT
+artifact="$tmpdir/ghostty.rpm"
+curl -fsSL --retry 3 --output "$artifact" "$url"
+rpmkeys --checksig --verbose "$artifact" >/dev/null
+
+rpm_version=$(rpm -qp --qf '%{VERSION}' "$artifact")
+rpm_release=$(rpm -qp --qf '%{RELEASE}' "$artifact")
+release_number=${rpm_release%%.fc*}
+latest="${rpm_version}_${release_number}"
+current=$({ $BREW list --versions "$FORMULA" 2>/dev/null || true; } |
+    awk '{ print $2 }' | tail -n 1)
+
+printf 'current=%s latest=%s update_available=%s\n' \
+    "${current:-not-installed}" "$latest" "$([[ "$current" == "$latest" ]] && echo false || echo true)"
+
+if [[ "${1:-}" == "--check" || "$current" == "$latest" ]]; then
+    exit 0
+fi
+
+sha256=$(sha256sum "$artifact" | awk '{ print $1 }')
+export HOMEBREW_NO_AUTO_UPDATE=1
+
+$BREW bump-formula-pr --write-only --no-audit \
+    --version "$latest" --url "$url" --sha256 "$sha256" "$FORMULA"
+
+if [[ -z "$current" ]]; then
+    $BREW install "$FORMULA"
+else
+    $BREW upgrade "$FORMULA"
+fi
+
+$BREW test "$FORMULA"
+$BREW cleanup "$FORMULA"

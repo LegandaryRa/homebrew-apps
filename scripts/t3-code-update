@@ -1,0 +1,138 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+    printf 'usage: t3-code-update [--check|--force]\n'
+}
+
+mode=update
+case "${1:-}" in
+    "") ;;
+    --check) mode=check ;;
+    --force) mode=force ;;
+    --help|-h) usage; exit 0 ;;
+    *) usage >&2; exit 2 ;;
+esac
+
+data_home="${XDG_DATA_HOME:-$HOME/.local/share}"
+state_home="${XDG_STATE_HOME:-$HOME/.local/state}"
+data_dir="$data_home/t3-code"
+releases_dir="$data_dir/releases"
+state_dir="$state_home/t3-code"
+api_url="https://api.github.com/repos/pingdotgg/t3code/releases/latest"
+
+install -d -m 700 "$releases_dir" "$state_dir"
+exec 9>"$state_dir/update.lock"
+flock -n 9 || exit 0
+
+tmp_meta="$(mktemp "$state_dir/release.XXXXXX.json")"
+tmp_download=""
+tmp_extract=""
+cleanup() {
+    rm -f -- "$tmp_meta"
+    [[ -z "$tmp_download" ]] || rm -f -- "$tmp_download"
+    [[ -z "$tmp_extract" ]] || rm -rf -- "$tmp_extract"
+}
+trap cleanup EXIT
+
+curl --fail --silent --show-error --location \
+    --retry 3 --connect-timeout 15 --max-time 120 \
+    -H 'Accept: application/vnd.github+json' \
+    -o "$tmp_meta" "$api_url"
+
+release="$({ jq -er '
+  select(.draft == false and .prerelease == false)
+  | .tag_name as $tag
+  | ([.assets[] | select(.name | test("^T3-Code-[0-9.]+-x86_64\\.AppImage$"))][0]) as $asset
+  | select($asset != null)
+  | [$tag, $asset.name, $asset.browser_download_url, $asset.digest]
+  | @tsv
+' "$tmp_meta"; })"
+
+IFS=$'\t' read -r tag asset_name asset_url digest <<<"$release"
+version="${tag#v}"
+if [[ ! "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+    printf 'T3 release %s has no trusted SHA-256 asset digest\n' "$tag" >&2
+    exit 1
+fi
+expected_sha="${digest#sha256:}"
+
+current_target=""
+if [[ -L "$data_dir/current" ]]; then
+    current_target="$(readlink -f -- "$data_dir/current" 2>/dev/null || true)"
+fi
+current_version="none"
+if [[ -n "$current_target" ]]; then
+    current_version="$(basename -- "$(dirname -- "$current_target")")"
+fi
+
+if [[ "$mode" == check ]]; then
+    available=false
+    [[ "$current_version" == "$version" ]] || available=true
+    printf 'current=%s latest=%s update_available=%s\n' "$current_version" "$version" "$available"
+    exit 0
+fi
+
+if [[ "$mode" != force && "$current_version" == "$version" ]]; then
+    printf 'T3 Code %s is already current\n' "$version"
+    exit 0
+fi
+
+if [[ -n "$current_target" ]] && pgrep -u "$(id -u)" -f 'T3-Code.*AppImage|t3_code_alpha\.appimage' >/dev/null 2>&1; then
+    printf 'T3 Code is running; update deferred\n'
+    exit 0
+fi
+
+release_dir="$releases_dir/$version"
+destination="$release_dir/T3-Code.AppImage"
+install -d -m 700 "$release_dir"
+
+if [[ ! -f "$destination" ]] || [[ "$(sha256sum "$destination" | awk '{print $1}')" != "$expected_sha" ]]; then
+    tmp_download="$(mktemp "$releases_dir/.download-${version}.XXXXXX")"
+    script_dir="$(cd -- "$(dirname -- "$(readlink -f -- "$0")")" && pwd -P)"
+    bootstrap="$script_dir/bootstrap.AppImage"
+    if [[ -f "$bootstrap" ]] && [[ "$(sha256sum "$bootstrap" | awk '{print $1}')" == "$expected_sha" ]]; then
+        cp --reflink=auto -- "$bootstrap" "$tmp_download"
+    else
+        curl --fail --show-error --location --retry 3 \
+            --connect-timeout 15 --max-time 1800 \
+            -o "$tmp_download" "$asset_url"
+    fi
+    printf '%s  %s\n' "$expected_sha" "$tmp_download" | sha256sum --check --status
+
+    magic="$(dd if="$tmp_download" bs=1 skip=8 count=3 status=none | od -An -tx1 | tr -d ' \n')"
+    if [[ "$magic" != 414902 ]]; then
+        printf 'Downloaded T3 asset is not an AppImage v2 file\n' >&2
+        exit 1
+    fi
+
+    chmod 700 "$tmp_download"
+    mv -f -- "$tmp_download" "$destination"
+    tmp_download=""
+fi
+
+if [[ -n "$current_target" && "$current_target" != "$destination" && -f "$current_target" ]]; then
+    ln -sfn -- "$current_target" "$data_dir/previous"
+fi
+ln -s -- "$destination" "$data_dir/.current.new"
+mv -Tf -- "$data_dir/.current.new" "$data_dir/current"
+
+tmp_extract="$(mktemp -d "$state_dir/extract.XXXXXX")"
+if (cd "$tmp_extract" && "$destination" --appimage-extract >/dev/null 2>&1); then
+    icon="$(find "$tmp_extract/squashfs-root" -type f -iname '*.png' -printf '%s\t%p\n' 2>/dev/null | sort -nr | head -n 1 | cut -f 2- || true)"
+    if [[ -n "$icon" ]]; then
+        install -Dm 644 "$icon" "$data_home/icons/hicolor/512x512/apps/t3-code.png"
+    fi
+fi
+
+keep_current="$(readlink -f -- "$data_dir/current")"
+keep_previous="$(readlink -f -- "$data_dir/previous" 2>/dev/null || true)"
+for directory in "$releases_dir"/*; do
+    [[ -d "$directory" ]] || continue
+    candidate="$directory/T3-Code.AppImage"
+    [[ "$candidate" == "$keep_current" || "$candidate" == "$keep_previous" ]] || rm -rf -- "$directory"
+done
+
+command -v update-desktop-database >/dev/null 2>&1 && update-desktop-database "$data_home/applications" || true
+command -v gtk-update-icon-cache >/dev/null 2>&1 && gtk-update-icon-cache -f -t "$data_home/icons/hicolor" >/dev/null 2>&1 || true
+printf 'T3 Code updated to %s (%s)\n' "$version" "$asset_name"

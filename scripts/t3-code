@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+data_dir="${XDG_DATA_HOME:-$HOME/.local/share}/t3-code"
+current="$data_dir/current"
+script_dir="$(cd -- "$(dirname -- "$(readlink -f -- "$0")")" && pwd -P)"
+
+if [[ -x "$current" ]]; then
+    appimage="$current"
+else
+    appimage="$script_dir/bootstrap.AppImage"
+fi
+
+exec env DESKTOPINTEGRATION=1 "$appimage" --no-sandbox "$@"
