@@ -42,8 +42,7 @@ rpmkeys --checksig --verbose "$artifact" >/dev/null
 
 rpm_version=$(rpm -qp --qf '%{VERSION}' "$artifact")
 rpm_release=$(rpm -qp --qf '%{RELEASE}' "$artifact")
-release_number=${rpm_release%%.fc*}
-latest="${rpm_version}_${release_number}"
+latest="${rpm_version}-${rpm_release}"
 current=$({ $BREW list --versions "$FORMULA" 2>/dev/null || true; } |
     awk '{ print $2 }' | tail -n 1)
 

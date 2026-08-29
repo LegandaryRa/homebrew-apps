@@ -3,7 +3,7 @@ class GhosttyLinux < Formula
   homepage "https://ghostty.org/"
   url "https://download.copr.fedorainfracloud.org/results/scottames/ghostty/fedora-44-x86_64/10851188-ghostty/ghostty-1.3.1-4.fc44.x86_64.rpm",
       using: :nounzip
-  version "1.3.1_4"
+  version "1.3.1-4.fc44"
   sha256 "d688483de73a295b84a87e2fe4873e9645de4934ba5459294c02966f9e190dfc"
   license "MIT"
 
@@ -41,6 +41,6 @@ class GhosttyLinux < Formula
   end
 
   test do
-    assert_match version.to_s.split("_").first, shell_output("#{bin}/ghostty --version")
+    assert_match version.to_s, shell_output("#{bin}/ghostty --version")
   end
 end
