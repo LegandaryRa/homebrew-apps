@@ -22,14 +22,14 @@ class GhosttyLinux < Formula
     libexec.mkpath
     lib.mkpath
     share.mkpath
-    system "cp", "--no-preserve=context", "usr/bin/ghostty", libexec/"ghostty-bin"
-    system "cp", "-a", "--no-preserve=context", "usr/lib/.", lib
-    system "cp", "-a", "--no-preserve=context", "usr/share/.", share
+    cp "usr/bin/ghostty", libexec/"ghostty-bin"
+    cp_r "usr/lib/.", lib
+    cp_r "usr/share/.", share
     (bin/"ghostty").write_env_script libexec/"ghostty-bin",
                                       GHOSTTY_RESOURCES_DIR: opt_share/"ghostty"
 
     updater = Pathname(__dir__).parent/"scripts/ghostty-linux-update"
-    system "cp", "--no-preserve=context", updater, bin/"ghostty-linux-update"
+    cp updater, bin/"ghostty-linux-update"
     chmod 0755, bin/"ghostty-linux-update"
   end
 
