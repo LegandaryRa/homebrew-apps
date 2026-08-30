@@ -1,0 +1,83 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+    printf 'usage: t3-code-integrate <install|uninstall|status> [--no-service]\n'
+}
+
+action="${1:-}"
+service=true
+case "${2:-}" in
+    "") ;;
+    --no-service) service=false ;;
+    *) usage >&2; exit 2 ;;
+esac
+case "$action" in
+    install|uninstall|status) ;;
+    --help|-h) usage; exit 0 ;;
+    *) usage >&2; exit 2 ;;
+esac
+
+brew="@BREW@"
+desktop_source="@DESKTOP_FILE@"
+update="@UPDATE@"
+data_home="${XDG_DATA_HOME:-$HOME/.local/share}"
+config_home="${XDG_CONFIG_HOME:-$HOME/.config}"
+applications_dir="$data_home/applications"
+desktop_target="$applications_dir/t3-code.desktop"
+
+refresh_desktop_database() {
+    command -v update-desktop-database >/dev/null 2>&1 && \
+        update-desktop-database "$applications_dir" || true
+}
+
+migrate_legacy_timer() {
+    local unit_dir="$config_home/systemd/user"
+    local service_file="$unit_dir/t3-code-update.service"
+    local timer_file="$unit_dir/t3-code-update.timer"
+
+    [[ -f "$service_file" && -f "$timer_file" ]] || return 0
+    grep -Eq '^ExecStart=.*/t3-code-update$' "$service_file" || return 0
+    grep -Fq 'Description=Check daily for a stable T3 Code update' "$timer_file" || return 0
+
+    if command -v systemctl >/dev/null 2>&1; then
+        systemctl --user disable --now t3-code-update.timer >/dev/null 2>&1 || true
+    fi
+    rm -f -- "$service_file" "$timer_file"
+    if command -v systemctl >/dev/null 2>&1; then
+        systemctl --user daemon-reload >/dev/null 2>&1 || true
+    fi
+}
+
+case "$action" in
+    install)
+        install -d -m 755 "$applications_dir"
+        install -m 644 "$desktop_source" "$desktop_target"
+        refresh_desktop_database
+        if [[ "$service" == true ]]; then
+            migrate_legacy_timer
+            "$update"
+            "$brew" services stop t3-code-linux >/dev/null 2>&1 || true
+            "$brew" services start t3-code-linux
+        fi
+        printf 'T3 Code desktop integration installed at %s\n' "$desktop_target"
+        ;;
+    uninstall)
+        if [[ "$service" == true ]]; then
+            "$brew" services stop t3-code-linux
+        fi
+        rm -f -- "$desktop_target"
+        refresh_desktop_database
+        printf 'T3 Code desktop integration removed from %s\n' "$desktop_target"
+        ;;
+    status)
+        if [[ -f "$desktop_target" ]]; then
+            printf 'desktop=installed path=%s\n' "$desktop_target"
+        else
+            printf 'desktop=missing path=%s\n' "$desktop_target"
+        fi
+        if [[ "$service" == true ]]; then
+            "$brew" services info t3-code-linux
+        fi
+        ;;
+esac

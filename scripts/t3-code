@@ -11,4 +11,7 @@ else
     appimage="$script_dir/bootstrap.AppImage"
 fi
 
-exec env DESKTOPINTEGRATION=1 "$appimage" --no-sandbox "$@"
+exec env \
+    APPIMAGE_EXTRACT_AND_RUN="${APPIMAGE_EXTRACT_AND_RUN:-1}" \
+    DESKTOPINTEGRATION=1 \
+    "$appimage" --no-sandbox "$@"

@@ -110,6 +110,7 @@ if [[ ! -f "$destination" ]] || [[ "$(sha256sum "$destination" | awk '{print $1}
     mv -f -- "$tmp_download" "$destination"
     tmp_download=""
 fi
+chmod 700 "$destination"
 
 if [[ -n "$current_target" && "$current_target" != "$destination" && -f "$current_target" ]]; then
     ln -sfn -- "$current_target" "$data_dir/previous"

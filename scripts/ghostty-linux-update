@@ -2,7 +2,7 @@
 set -euo pipefail
 
 BREW=/home/linuxbrew/.linuxbrew/bin/brew
-FORMULA=local/apps/ghostty-linux
+FORMULA=LegandaryRa/apps/ghostty-linux
 REPO='copr:copr.fedorainfracloud.org:scottames:ghostty'
 LOCK_DIR="${XDG_RUNTIME_DIR:-/tmp}"
 

@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=T3 Code
+Comment=T3 Code desktop client
+Icon=@T3_CODE_ICON@
+TryExec=@T3_CODE_BIN@
+Exec=env DESKTOPINTEGRATION=1 @T3_CODE_BIN@ %U
+Terminal=false
+MimeType=x-scheme-handler/t3code;x-scheme-handler/t3code-dev;
+Categories=Development;
+StartupWMClass=t3code
+X-GNOME-UsesNotifications=true
