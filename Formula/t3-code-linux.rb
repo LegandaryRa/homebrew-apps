@@ -27,6 +27,7 @@ class T3CodeLinux < Formula
 
     inreplace buildpath/"t3-code-integrate", "@BREW@", HOMEBREW_PREFIX/"bin/brew"
     inreplace buildpath/"t3-code-integrate", "@DESKTOP_FILE@", opt_share/"applications/t3-code.desktop"
+    inreplace buildpath/"t3-code-integrate", "@FORMULA@", "LegandaryRa/apps/t3-code-linux"
     inreplace buildpath/"t3-code-integrate", "@UPDATE@", opt_bin/"t3-code-update"
 
     libexec.install buildpath/"t3-code", buildpath/"t3-code-update", buildpath/"t3-code-integrate"
@@ -74,14 +75,13 @@ class T3CodeLinux < Formula
 
     assert_match "usage:", shell_output("#{bin}/t3-code-update --help")
 
-    system "env", "XDG_DATA_HOME=#{testpath}/integration",
-           bin/"t3-code-integrate", "install", "--no-service"
+    ENV["XDG_DATA_HOME"] = (testpath/"integration").to_s
+    system bin/"t3-code-integrate", "install", "--no-service"
     desktop = testpath/"integration/applications/t3-code.desktop"
     assert_predicate desktop, :file?
     assert_match (opt_bin/"t3-code").to_s, desktop.read
 
-    system "env", "XDG_DATA_HOME=#{testpath}/integration",
-           bin/"t3-code-integrate", "uninstall", "--no-service"
+    system bin/"t3-code-integrate", "uninstall", "--no-service"
     refute_path_exists desktop
   end
 end

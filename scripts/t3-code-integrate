@@ -20,6 +20,7 @@ esac
 
 brew="@BREW@"
 desktop_source="@DESKTOP_FILE@"
+formula="@FORMULA@"
 update="@UPDATE@"
 data_home="${XDG_DATA_HOME:-$HOME/.local/share}"
 config_home="${XDG_CONFIG_HOME:-$HOME/.config}"
@@ -57,14 +58,14 @@ case "$action" in
         if [[ "$service" == true ]]; then
             migrate_legacy_timer
             "$update"
-            "$brew" services stop t3-code-linux >/dev/null 2>&1 || true
-            "$brew" services start t3-code-linux
+            "$brew" services stop "$formula" >/dev/null 2>&1 || true
+            "$brew" services start "$formula"
         fi
         printf 'T3 Code desktop integration installed at %s\n' "$desktop_target"
         ;;
     uninstall)
         if [[ "$service" == true ]]; then
-            "$brew" services stop t3-code-linux
+            "$brew" services stop "$formula"
         fi
         rm -f -- "$desktop_target"
         refresh_desktop_database
@@ -77,7 +78,7 @@ case "$action" in
             printf 'desktop=missing path=%s\n' "$desktop_target"
         fi
         if [[ "$service" == true ]]; then
-            "$brew" services info t3-code-linux
+            "$brew" services info "$formula"
         fi
         ;;
 esac
