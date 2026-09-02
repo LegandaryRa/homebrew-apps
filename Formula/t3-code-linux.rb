@@ -1,8 +1,9 @@
 class T3CodeLinux < Formula
   desc "Homebrew-managed T3 Code launcher and stable Linux updater"
   homepage "https://github.com/pingdotgg/t3code"
-  url "https://github.com/pingdotgg/t3code/releases/download/v0.0.36/T3-Code-0.0.36-x86_64.AppImage"
-  sha256 "f19c36ce903331f8d5906f2f90e6fbaae576fde53ab37e1eeb201f3c50c9acf1"
+  url "https://github.com/pingdotgg/t3code/releases/download/v0.0.39-nightly.20260902.1257/T3-Code-0.0.39-nightly.20260902.1257-x86_64.AppImage"
+  version "0.0.39-nightly.20260902.1257"
+  sha256 "a8fa9413b6aa7bde3f5ad7c94def29f6aafaaac3f185f7d14f47eef60550e929"
   license "MIT"
 
   depends_on arch: :x86_64
