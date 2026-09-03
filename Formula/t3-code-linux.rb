@@ -1,9 +1,16 @@
 class T3CodeLinux < Formula
   desc "Homebrew-managed T3 Code launcher and stable Linux updater"
   homepage "https://github.com/pingdotgg/t3code"
-  url "https://github.com/pingdotgg/t3code/releases/download/v0.0.36/T3-Code-0.0.36-x86_64.AppImage"
-  sha256 "f19c36ce903331f8d5906f2f90e6fbaae576fde53ab37e1eeb201f3c50c9acf1"
+  url "https://github.com/pingdotgg/t3code/releases/download/v0.0.38/T3-Code-0.0.38-x86_64.AppImage"
+  sha256 "1f1ccd922b2efaffd50447b028ee0d6e2525502905087cf8ae3fe41efebe346f"
   license "MIT"
+
+  # The default GitHub release checker chooses the newest tag, including
+  # nightly builds. GitHub's `releases/latest` endpoint excludes prereleases.
+  livecheck do
+    url :stable
+    strategy :github_latest
+  end
 
   depends_on arch: :x86_64
   depends_on "jq"
